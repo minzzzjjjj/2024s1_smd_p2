@@ -12,6 +12,10 @@ import java.util.stream.Collectors;
 @SuppressWarnings("serial")
 public class LuckyThirdteen extends CardGame {
 
+    Factory factory = Factory.getInstance();
+    private int humanIndex;
+    private HashMap<Integer, Player> index_playerType;
+
     public enum Suit {
         SPADES ("S", 4), HEARTS ("H", 3),
         DIAMONDS ("D", 2), CLUBS ("C", 1);
@@ -141,6 +145,8 @@ public class LuckyThirdteen extends CardGame {
         return rank.getScoreCardValue() * Suit.PUBLIC_CARD_MULTIPLICATION_FACTOR;
     }
 
+    //mark1 给有13点的玩家，计算maxscore,需要添加新feature，根据option3，再多算几种情况
+    // 如果没有13点，这个函数会return 0
     private int calculateMaxScoreForThirteenPlayer(int playerIndex) {
         List<Card> privateCards = hands[playerIndex].getCardList();
         List<Card> publicCards = playingArea.getCardList();
@@ -185,26 +191,43 @@ public class LuckyThirdteen extends CardGame {
             }
         }
 
+        if (isThirteenCardsOption3(privateCard1,privateCard2,publicCard1,publicCard2)) {
+            int score = getScorePrivateCard(privateCard2) + getScorePublicCard(publicCard2) + getScorePrivateCard(privateCard1) + getScorePublicCard(publicCard1);
+            if (maxScore < score) {
+                maxScore = score;
+            }
+        }
+
         return maxScore;
     }
 
+    //mark
+    // calculation logic
+    //
     private void calculateScoreEndOfRound() {
         List<Boolean> isThirteenChecks = Arrays.asList(false, false, false, false);
+        //在检查四个玩家里，谁有13点
         for (int i = 0; i < hands.length; i++) {
             isThirteenChecks.set(i, isThirteen(i));
         }
+
+        //拿到有13点的玩家的index
         List<Integer> indexesWithThirteen = new ArrayList<>();
         for (int i = 0; i < isThirteenChecks.size(); i++) {
             if (isThirteenChecks.get(i)) {
                 indexesWithThirteen.add(i);
             }
         }
+
         long countTrue = indexesWithThirteen.size();
         Arrays.fill(scores, 0);
+
+        //case1,只有一个玩家有13点的情况，
         if (countTrue == 1) {
             int winnerIndex = indexesWithThirteen.get(0);
             scores[winnerIndex] = 100;
-        } else if (countTrue > 1) {
+        }// case3,多余一名玩家获得13点点情况，需要再额外考虑option3
+        else if (countTrue > 1) {
             for (Integer thirteenIndex : indexesWithThirteen) {
                 scores[thirteenIndex] = calculateMaxScoreForThirteenPlayer(thirteenIndex);
             }
@@ -244,15 +267,35 @@ public class LuckyThirdteen extends CardGame {
         for (int i = 0; i < nbPlayers; i++) {
             hands[i].sort(Hand.SortType.SUITPRIORITY, false);
         }
-        // Set up human player for interaction
-        CardListener cardListener = new CardAdapter()  // Human Player plays card
-        {
-            public void leftDoubleClicked(Card card) {
-                selected = card;
-                hands[0].setTouchEnabled(false);
+
+        index_playerType = new HashMap<>();
+        humanIndex = -1;
+        for (int i = 0; i < nbPlayers; i++) {
+            String playerString = "players." + i;
+            //如果在property file中对应的players.x有写东西，则导入
+            if (!properties.getProperty(playerString).isEmpty()) {
+                String type = properties.getProperty(playerString);
+                if (type.equals("human")) {
+                    humanIndex = i;
+                }else {
+                    index_playerType.put(i,factory.createPlayer(type));
+                }
             }
-        };
-        hands[0].addCardListener(cardListener);
+        }
+        // Set up human player for interaction
+        // pdf 里没有说明白是否human会固定在0，如果固定，大家都好，如果不固定；
+        // 将hands[0]改为hands[humanIndex]
+        if (humanIndex != -1) {
+            CardListener cardListener = new CardAdapter()  // Human Player plays card
+            {
+                public void leftDoubleClicked(Card card) {
+                    selected = card;
+                    hands[humanIndex].setTouchEnabled(false);
+                }
+            };
+            hands[humanIndex].addCardListener(cardListener);
+        }
+
         // graphics
         RowLayout[] layouts = new RowLayout[nbPlayers];
         for (int i = 0; i < nbPlayers; i++) {
@@ -348,6 +391,7 @@ public class LuckyThirdteen extends CardGame {
     }
 
 
+    //mark3
     private boolean isThirteenFromPossibleValues(int[] possibleValues1, int[] possibleValues2) {
         for (int value1 : possibleValues1) {
             for (int value2 : possibleValues2) {
@@ -359,10 +403,35 @@ public class LuckyThirdteen extends CardGame {
         return false;
     }
 
+    //mark2
     private boolean isThirteenCards(Card card1, Card card2) {
         Rank rank1 = (Rank) card1.getRank();
         Rank rank2 = (Rank) card2.getRank();
         return isThirteenFromPossibleValues(rank1.getPossibleSumValues(), rank2.getPossibleSumValues());
+    }
+
+    private boolean isThirteenCardsOption3(Card card1, Card card2, Card card3, Card card4) {
+        Rank rank1 = (Rank) card1.getRank();
+        Rank rank2 = (Rank) card2.getRank();
+        Rank rank3 = (Rank) card3.getRank();
+        Rank rank4 = (Rank) card4.getRank();
+
+        return isThirteenFromPossibleValuesOption3(rank1.getPossibleSumValues(), rank2.getPossibleSumValues(),rank3.getPossibleSumValues(), rank4.getPossibleSumValues());
+    }
+
+    private boolean isThirteenFromPossibleValuesOption3(int[] possibleValues1, int[] possibleValues2,int[] possibleValues3, int[] possibleValues4) {
+        for (int value1 : possibleValues1) {
+            for (int value2 : possibleValues2) {
+                for (int value3: possibleValues3) {
+                    for (int value4: possibleValues4) {
+                        if (value1 + value2 + value3 + value4 == THIRTEEN_GOAL) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isThirteenMixedCards(List<Card> privateCards, List<Card> publicCards) {
@@ -377,12 +446,53 @@ public class LuckyThirdteen extends CardGame {
         return false;
     }
 
+    //applying summing logic of option3
+    private boolean isThirteenOption3Cards(List<Card> privateCards, List<Card> publicCards) {
+        Card privateCard1 = privateCards.get(0);
+        Card privateCard2 = privateCards.get(1);
+        Card publicCard1 = publicCards.get(0);
+        Card publicCard2 = publicCards.get(1);
+
+        return isThirteenCardsOption3(privateCard1,privateCard2,publicCard1,publicCard2);
+
+//        Rank rankPrivate1 = (Rank) privateCard1.getRank();
+//        Rank rankPrivate2 = (Rank) privateCard2.getRank();
+//        Rank rankPublic1 = (Rank) publicCard1.getRank();
+//        Rank rankPublic2 = (Rank) publicCard2.getRank();
+//
+//        int[] possibleValuesPrivate1 = rankPrivate1.getPossibleSumValues();
+//        int[] possibleValuesPrivate2 = rankPrivate2.getPossibleSumValues();
+//        int[] possibleValuesPublic1 = rankPublic1.getPossibleSumValues();
+//        int[] possibleValuesPublic2 = rankPublic2.getPossibleSumValues();
+//
+//        for (int value1 : possibleValuesPrivate1) {
+//            for (int value2: possibleValuesPrivate2) {
+//                for (int value3: possibleValuesPublic1) {
+//                    for (int value4: possibleValuesPublic2) {
+//                        if (value1 + value2 + value3 + value4 == THIRTEEN_GOAL) {
+//                            return true;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        return false;
+    }
+
+    //mark
+    // option 1 and 2
+    //apply option3 here
     private boolean isThirteen(int playerIndex) {
         List<Card> privateCards = hands[playerIndex].getCardList();
         List<Card> publicCards = playingArea.getCardList();
+        //option1
         boolean isThirteenPrivate = isThirteenCards(privateCards.get(0), privateCards.get(1));
+        //option2
         boolean isThirteenMixed = isThirteenMixedCards(privateCards, publicCards);
-        return isThirteenMixed || isThirteenPrivate;
+
+        //option3
+        boolean isThirteenOption3 = isThirteenOption3Cards(privateCards, publicCards);
+        return isThirteenMixed || isThirteenPrivate || isThirteenOption3;
     }
 
 
@@ -529,17 +639,28 @@ public class LuckyThirdteen extends CardGame {
             }
 
             if (!isAuto || finishedAuto) {
-                if (0 == nextPlayer) {
-                    hands[0].setTouchEnabled(true);
+                // human player
+                if (humanIndex == nextPlayer) {
+                    hands[humanIndex].setTouchEnabled(true);
 
                     setStatus("Player 0 is playing. Please double click on a card to discard");
                     selected = null;
-                    dealACardToHand(hands[0]);
+                    dealACardToHand(hands[humanIndex]);
                     while (null == selected) delay(delayTime);
                     selected.removeFromHand(true);
                 } else {
+                    // here the random player is playing
+                    // now need to change it to other players
+                    // applying players logic here
                     setStatusText("Player " + nextPlayer + " thinking...");
-                    selected = getRandomCard(hands[nextPlayer]);
+
+                    dealACardToHand(hands[nextPlayer]);
+
+                    delay(thinkingTime);
+
+                    selected = index_playerType.get(nextPlayer).playCard(hands[nextPlayer],random);
+
+//                        selected = getRandomCard(hands[nextPlayer]);
                     selected.removeFromHand(true);
                 }
             }

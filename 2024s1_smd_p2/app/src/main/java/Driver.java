@@ -8,5 +8,4 @@ public class Driver {
         String logResult = new LuckyThirdteen(properties).runApp();
         System.out.println("logResult = " + logResult);
     }
-
 }
