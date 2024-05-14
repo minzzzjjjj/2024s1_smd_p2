@@ -2,13 +2,14 @@ import ch.aplu.jcardgame.Card;
 import ch.aplu.jcardgame.Hand;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 // new part 6
 public class BasicPlayer extends Player{
 
     @Override
-    public Card playCard(Hand hand, Random random) {
+    public Card playCard(Hand hand, Random random, List<Card> cardsPlayed) {
         ArrayList<Card> handCards = hand.getCardList();
         int min = 1000;
         Card selected = null;

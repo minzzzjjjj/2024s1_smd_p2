@@ -658,7 +658,7 @@ public class LuckyThirdteen extends CardGame {
 
                     delay(thinkingTime);
 
-                    selected = index_playerType.get(nextPlayer).playCard(hands[nextPlayer],random);
+                    selected = index_playerType.get(nextPlayer).playCard(hands[nextPlayer],random,cardsPlayed);
 
 //                        selected = getRandomCard(hands[nextPlayer]);
                     selected.removeFromHand(true);
